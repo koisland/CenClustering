@@ -1,0 +1,16 @@
+
+# include: "rules/data.smk"
+# include: "rules/align.smk"
+# include: "rules/get_uniq_chimp_reg.smk"
+# include: "rules/intersect_uniq_chm13_chimp.smk"
+include: "rules/phylogeny.smk"
+
+
+rule all:
+    input:
+        rules.phylogeny_all.input
+        # rules.get_chimp_rm.output,
+        # rules.align_asm_ref_all.input,
+        # rules.find_uniq_regions_chimp.output,
+        # rules.intersect_uniq_chimp_regions_with_chm13_aln.output,
+    default_target: True

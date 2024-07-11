@@ -1,0 +1,6 @@
+.snakemake/
+temp/
+data/
+logs/
+benchmark
+results/
