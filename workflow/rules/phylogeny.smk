@@ -1,13 +1,11 @@
-HAPS = ["hap1", "hap2"]
 ARMS = ["parm", "qarm"]
-HEURISTIC = ["min", "max"]
+HEURISTIC = ["1", "2"]
 with open("hgsvc3_samples.list", "rt") as fh:
     SAMPLES = [l.strip() for l in fh.readlines()]
 
 wildcard_constraints:
     arm="|".join(ARMS),
     sm="|".join(SAMPLES),
-    hap="|".join(HAPS),
     heuristic="|".join(HEURISTIC)
 
 
@@ -121,7 +119,6 @@ rule merge_regions_by_arm:
         #     arm=[wc.arm]
         # ),
         fa_chimp=rules.add_prefix_to_seq_chimp.output,
-        fa_chm13=rules.get_ref_regions.output,
     output:
         fa="results/msa/{arm}.fa",
         faidx="results/msa/{arm}.fa.fai",
@@ -131,7 +128,7 @@ rule merge_regions_by_arm:
         "logs/merge_regions_by_arm_{arm}.log"
     shell:
         """
-        cat {input.fa_sm} {input.fa_chimp} {input.fa_chm13} > {output.fa}
+        cat {input.fa_sm} {input.fa_chimp} > {output.fa}
         samtools faidx {output.fa} 2> {log}
         """
 
@@ -143,14 +140,15 @@ rule remove_dupes:
     output:
         faidx="results/msa/{arm}_{heuristic}.fa.fai",
     params:
-        region_len=20_000
+        region_len=20_000,
+        heuristic=lambda wc: "min" if wc.heuristic == "1" else "max"
     conda:
         "../env/py.yaml"
     log:
         "logs/remove_dupes_{arm}_{heuristic}.log"
     shell:
         """
-        python {input.script} -i {input.faidx} --heuristic {wildcards.heuristic} --len {params.region_len} > {output} 2> {log}
+        python {input.script} -i {input.faidx} --heuristic {params.heuristic} --len {params.region_len} > {output} 2> {log}
         """
 
 rule subset_fa:
@@ -168,8 +166,8 @@ rule subset_fa:
         "logs/subset_fa_{arm}_{heuristic}.log"
     shell:
         """
-        seqtk subseq {input.fa} <(cut -f 1 {input.faidx} | grep -v "{params.omit}" ) > {output} 2> {log}
-        samtools faidx {output}
+        seqtk subseq {input.fa} <(cut -f 1 {input.faidx} | grep -v "{params.omit}" ) > {output.fa} 2> {log}
+        samtools faidx {output.fa}
         """
 
 rule msa:
