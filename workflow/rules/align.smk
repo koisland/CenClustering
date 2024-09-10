@@ -1,25 +1,12 @@
-# Generate table
-ASM_TABLE = f"/tmp/table_{hash(workflow.basedir)}.asm.tbl"
-with open(ASM_TABLE, "wt") as tbl_fh:
-    tbl_fh.write("sample\tasm\n")
-    tbl_fh.write(f"mPanTro3\t{rules.get_chimp_asm.output}\n")
+include: "data.smk"
 
 
 ALN_CFG = {
     "ref": {"CHM13": rules.get_chm13_asm.output},
-    "tbl": ASM_TABLE,
-    "aln_threads": 4,
+    "sm": {"mPanTro3": rules.get_chimp_asm.output},
+    "aln_threads": 24,
     # https://github.com/koisland/asm-to-reference-alignment/blob/remove_sm_num_index/config/clint.yaml
     "mm2_opts": "-x asm20 --secondary=no -s 25000 -K 8G",
-    "second_aln": "no",
-    ## THE FOLLOWING OPTIONS ARE ONLY USED FOR GENE CONVERSION ANALYSIS AND NOT ALIGNMENT AND CAN BE IGNORRED
-    # subset the gene conversion analysis to just these regions on the reference
-    # bed: /net/eichler/vol26/projects/chm13_t2t/nobackups/Assembly_analysis/SEDEF/chm13_v1.1_plus38Y.SDs.bed
-    "break_paf": 10000,
-    "bed": "config/SDs.and.lowid.bed",
-    "window": 1000,
-    "slide": 100,
-    "min_aln_len": 1000000,
 }
 
 
@@ -32,37 +19,39 @@ module align_asm_to_ref:
         github(
             "koisland/asm-to-reference-alignment",
             path="workflow/Snakefile",
-            branch="remove_sm_num_index",
+            branch="minimal",
         )
     config:
         ALN_CFG
 
 
-use rule * from align_asm_to_ref exclude dipcall, ideogram as asm_ref_*
+use rule * from align_asm_to_ref as asm_ref_*
 
 
-# Override rules from ^ because input getter functions run before concat_asm so cannot detect file.
-use rule alignment from align_asm_to_ref as asm_ref_alignment with:
+rule alignment_idx:
     input:
-        ref=rules.get_chm13_asm.output,
-        query=rules.get_chimp_asm.output,
-    resources:
-        mem=30,
+        bam=rules.asm_ref_alignment.output,
+    output:
+        bam="results/{ref}/bam/{sm}.bam",
+        bam_idx="results/{ref}/bam/{sm}.bam.bai",
+    conda:
+        "../env/tools.yaml"
+    log:
+        "logs/asm_{sm}_{ref}_alignment_idx.log",
+    shell:
+        """
+        samtools sort {input.bam} -o {output.bam} 2> {log}
+        samtools index {output.bam} 2>> {log}
+        """
 
 
-use rule alignment2 from align_asm_to_ref as asm_ref_alignment2 with:
+rule align_all:
     input:
-        ref_fasta=rules.get_chm13_asm.output,
-        query=rules.get_chimp_asm.output,
-        # Weird. Blank if passing reference rule output from above. Use string instead.
-        aln="temp/{ref}/{sm}.bam",
-
-
-use rule all from align_asm_to_ref as align_asm_ref_all with:
-    input:
-        ra=rules.asm_ref_reference_alignment.input,
-        SafFire=expand(
-            rules.asm_ref_SafFire.output,
-            sm=["mPanTro3"],
-            ref=["CHM13"],
+        expand(
+            rules.asm_ref_all.input, ref=ALN_CFG["ref"].keys(), sm=ALN_CFG["sm"].keys()
+        ),
+        expand(
+            rules.alignment_idx.output,
+            ref=ALN_CFG["ref"].keys(),
+            sm=ALN_CFG["sm"].keys(),
         ),

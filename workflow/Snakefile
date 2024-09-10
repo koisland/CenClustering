@@ -1,16 +1,41 @@
+from os.path import join
+from collections import defaultdict
+from itertools import chain
 
-# include: "rules/data.smk"
-# include: "rules/align.smk"
-# include: "rules/get_uniq_chimp_reg.smk"
-# include: "rules/intersect_uniq_chm13_chimp.smk"
+
+configfile: "config.yaml"
+
+
+CHR_ARMS = config["chrs"]
+ARMS = chain(*CHR_ARMS.values())
+ASSEMBLIES = {}
+SAMPLES = set()
+ALIGNMENTS = defaultdict(dict)
+
+with open(config["sample_sheet"], "rt") as fh:
+    for line in fh.readlines():
+        line = line.strip()
+        # NA19036	hap1	verkko	chr2	/project/logsdon_shared/data/hgsvc3/verkko_alignments_t2tv2_batch3/NA19036.bam
+        sm, hap, asm, chrom, aln = line.split("\t")
+        ALIGNMENTS[sm][asm] = aln
+        SAMPLES.add(sm)
+        ASSEMBLIES[sm] = asm
+
+
+wildcard_constraints:
+    chrom="|".join(CHR_ARMS.keys()),
+    arm="|".join(ARMS),
+    sm="|".join(SAMPLES),
+    asm="|".join(ASSEMBLIES.values()),
+
+
+include: "rules/data.smk"
+include: "rules/align.smk"
 include: "rules/phylogeny.smk"
 
 
 rule all:
     input:
-        rules.phylogeny_all.input
-        # rules.get_chimp_rm.output,
-        # rules.align_asm_ref_all.input,
-        # rules.find_uniq_regions_chimp.output,
-        # rules.intersect_uniq_chimp_regions_with_chm13_aln.output,
+        rules.align_all.input,
+        rules.phylogeny_all.input,
     default_target: True
