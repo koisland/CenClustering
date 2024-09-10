@@ -91,7 +91,7 @@ use rule add_prefix_to_seq_chimp as add_prefix_to_seq_sm with:
 rule merge_regions_by_arm:
     input:
         fa_sm=lambda wc: chain(*[
-            expand(rules.add_prefix_to_seq_sm.output, sm=sm, arm=[wc.arm], chrom=[wc.chrom], asm=[ASSEMBLIES[sm]])
+            expand(rules.add_prefix_to_seq_sm.output, sm=sm, arm=[wc.arm], chrom=[wc.chrom], asm=ASSEMBLIES[sm])
             for sm in SAMPLES
         ]),
         fa_chimp=rules.add_prefix_to_seq_chimp.output,
@@ -114,7 +114,7 @@ rule remove_dupes:
         script="workflow/scripts/dedupe_fai.py",
         faidx=rules.merge_regions_by_arm.output.faidx,
     output:
-        faidx="results/msa/{chrom}_{arm}.fa.fai",
+        faidx="results/msa/{chrom}_{arm}_dedup.fa.fai",
     params:
         region_len=20_000,
         heuristic="min",
@@ -132,18 +132,27 @@ rule subset_fa:
     input:
         fa=rules.merge_regions_by_arm.output.fa,
         faidx=rules.remove_dupes.output.faidx,
+        sample_sheet=config["sample_sheet"],
     output:
-        fa="results/msa/{chrom}_{arm}_dedup.fa",
-        faidx="results/msa/{chrom}_{arm}_dedup.fa.fai",
-    params:
-        omit="mPanTro3_{chrom}_hap2",
+        fa="results/msa/{chrom}_{arm}_subset.fa",
+        faidx="results/msa/{chrom}_{arm}_subset.fa.fai",
     conda:
         "../env/tools.yaml"
     log:
         "logs/subset_fa_{chrom}_{arm}.log",
     shell:
         """
-        {{ seqtk subseq {input.fa} <(cut -f 1 {input.faidx} | grep -v "{params.omit}" ) | \
+        {{ seqtk subseq {input.fa} \
+            <(
+                grep -f <(
+                    awk '{{
+                        if ($4=="{wildcards.chrom}") {{
+                            print $1"_"$2"_"$3
+                        }}
+                    }}' {input.sample_sheet}
+                ) {input.faidx} | \
+                cat - <(grep "mPanTro3" {input.faidx} | cut -f 1)
+            ) | \
         seqkit rmdup ;}} > {output.fa} 2> {log}
         samtools faidx {output.fa}
         """

@@ -8,7 +8,7 @@ configfile: "config.yaml"
 
 CHR_ARMS = config["chrs"]
 ARMS = chain(*CHR_ARMS.values())
-ASSEMBLIES = {}
+ASSEMBLIES = defaultdict(list)
 SAMPLES = set()
 ALIGNMENTS = defaultdict(dict)
 
@@ -19,14 +19,14 @@ with open(config["sample_sheet"], "rt") as fh:
         sm, hap, asm, chrom, aln = line.split("\t")
         ALIGNMENTS[sm][asm] = aln
         SAMPLES.add(sm)
-        ASSEMBLIES[sm] = asm
+        ASSEMBLIES[sm].append(asm)
 
 
 wildcard_constraints:
     chrom="|".join(CHR_ARMS.keys()),
     arm="|".join(ARMS),
     sm="|".join(SAMPLES),
-    asm="|".join(ASSEMBLIES.values()),
+    asm="|".join(["verkko", "hifiasm"]),
 
 
 include: "rules/data.smk"
