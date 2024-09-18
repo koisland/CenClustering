@@ -2,10 +2,10 @@ chrs:
   # chr and p/q arm
   # Requires chr_arm_bed to exist.
   chr2: ["parm", "qarm"]
-  chr20: ["qarm"]
+  # chr20: ["qarm"]
 # Sample sheet
 # Expects [sm, hap, asm, chrom, aln]
-sample_sheet: "config/samples.tsv"
+sample_sheet: "config/sample_subset.tsv"
 # BED with region mapping chimp to CHM13
 # Expects "{chrom}_{arm}.bed"
 chr_arm_bed_dir: "config/bed"
